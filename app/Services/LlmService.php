@@ -25,7 +25,7 @@ class LlmService
 
         if (! str_contains($providerModel, '/')) {
             throw new InvalidArgumentException(
-                'Model must be in format "provider/model" (e.g., "openai/gpt-4")'
+                'Model must be in format "provider/model" (e.g., "openai/gpt-5.1")'
             );
         }
 
