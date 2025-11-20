@@ -59,7 +59,7 @@ Laravel 12, PHP 8.2
 
 ## Directory Structure
 
-```
+
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── README.md
@@ -115,7 +115,7 @@ Laravel 12, PHP 8.2
 │   └── Unit
 │       └── ExampleTest.php
 └── vite.config.js
-```
+
 
 ## Key Entry Points
 
