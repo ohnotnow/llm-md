@@ -36,6 +36,7 @@ Edit `config/generator.php`:
 - `max_tokens` - Default 100k
 - `tree.max_depth` - Directory scan depth (default 4)
 - `tree.skip_at_root` - Directories to exclude
+- `timeout` - Maximum wait on the LLM API call (default 300 (5 minutes))
 
 ## License
 
@@ -43,4 +44,3 @@ MIT
 
 ## Example (for this repo)
 [_Note: not the best example as it's such a small project_](.llm.md)
-

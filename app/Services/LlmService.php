@@ -44,7 +44,7 @@ class LlmService
             ->using($this->provider, $this->model)
             ->withPrompt($prompt)
             ->withMaxTokens($this->maxTokens)
-            ->withClientOptions(['timeout' => 300])
+            ->withClientOptions(['timeout' => config('generator.timeout')])
             ->asText();
 
         return $response->text;

@@ -22,6 +22,7 @@ return [
     */
     'max_tokens' => env('GENERATOR_MAX_TOKENS', 100000),
     'temperature' => env('GENERATOR_TEMPERATURE', 0.7),
+    'timeout' => env('GENERATOR_TIMEOUT', 300),
 
     /*
     |--------------------------------------------------------------------------
