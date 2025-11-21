@@ -24,7 +24,6 @@ class MarkdownGenerator
         $output .= $techStack."\n\n";
 
         $output .= "## Directory Structure\n\n";
-        $output .= "```\n";
         $output .= $directoryTree;
         $output .= "```\n\n";
 
