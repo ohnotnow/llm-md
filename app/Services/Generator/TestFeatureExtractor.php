@@ -37,13 +37,22 @@ class TestFeatureExtractor
         $featureList = implode("\n", array_unique($features));
 
         // Generate prompt from Blade template
-        $prompt = View::make('prompts.filter-tests', [
+        $prompt = View::make('prompts.extract-features-pass1', [
             'summary' => $summary,
             'featureList' => $featureList,
         ])->render();
 
         // Filter via LLM
-        return $this->llmService->generate($prompt);
+        $extractedFeatures = $this->llmService->generate($prompt);
+
+        $prompt = View::make('prompts.synthesize-features-pass2', [
+            'summary' => $summary,
+            'extractedFeatures' => $extractedFeatures,
+        ])->render();
+
+        $synthesizedFeatures = $this->llmService->generate($prompt);
+
+        return $synthesizedFeatures;
     }
 
     /**

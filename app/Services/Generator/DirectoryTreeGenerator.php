@@ -2,100 +2,155 @@
 
 namespace App\Services\Generator;
 
+use Illuminate\Support\Facades\File;
+
 class DirectoryTreeGenerator
 {
     /**
-     * Generate a filtered directory tree.
+     * Directories under app/ to expand and show class names
      */
+    private array $expandDirectories = [
+        'Enums',
+        'Models',
+        'Services',
+        'Traits',
+        'Events',
+        'Jobs',
+        'Actions',
+        'Data',
+    ];
+
     public function generate(string $repoPath, ?int $maxDepth = null): string
     {
-        $maxDepth = $maxDepth ?? config('generator.tree.max_depth');
-        $gitignoreParser = new GitignoreParser($repoPath);
+        $output = "```\n";
+        $output .= $this->generateAppStructure($repoPath);
+        $output .= $this->generateOtherDirectories($repoPath);
 
-        return $this->generateTree(
-            dir: $repoPath,
-            repoRoot: $repoPath,
-            gitignoreParser: $gitignoreParser,
-            maxDepth: $maxDepth
-        );
+        return $output;
     }
 
-    /**
-     * Recursively generate the tree structure.
-     */
-    protected function generateTree(
-        string $dir,
-        string $repoRoot,
-        GitignoreParser $gitignoreParser,
-        string $prefix = '',
-        bool $isLast = true,
-        int $maxDepth = 4,
-        int $currentDepth = 0
-    ): string {
-        if ($currentDepth >= $maxDepth) {
+    private function generateAppStructure(string $repoPath): string
+    {
+        $appPath = $repoPath . '/app';
+
+        if (!File::isDirectory($appPath)) {
             return '';
         }
 
-        $output = '';
-        $items = $this->getFilteredItems($dir, $repoRoot, $gitignoreParser);
+        $output = "app/\n";
 
-        foreach ($items as $index => $item) {
-            $path = $dir.'/'.$item;
-            $isLastItem = ($index === count($items) - 1);
-            $connector = $isLastItem ? '└── ' : '├── ';
-            $output .= $prefix.$connector.$item."\n";
+        $directories = collect(File::directories($appPath))
+            ->map(fn ($dir) => basename($dir))
+            ->sort()
+            ->values();
 
-            if (is_dir($path)) {
-                $newPrefix = $prefix.($isLastItem ? '    ' : '│   ');
-                $output .= $this->generateTree(
-                    dir: $path,
-                    repoRoot: $repoRoot,
-                    gitignoreParser: $gitignoreParser,
-                    prefix: $newPrefix,
-                    isLast: $isLastItem,
-                    maxDepth: $maxDepth,
-                    currentDepth: $currentDepth + 1
-                );
+        foreach ($directories as $index => $dirName) {
+            $isLast = $index === $directories->count() - 1;
+            $prefix = $isLast ? '└──' : '├──';
+
+            $output .= "  {$prefix} {$dirName}/\n";
+
+            // Expand certain directories to show class names
+            if ($this->shouldExpand($dirName)) {
+                $classes = $this->getClassNames($appPath.'/'.$dirName);
+
+                if (! empty($classes)) {
+                    $indent = $isLast ? '      ' : '│     ';
+                    $classLine = $this->formatClassList($classes, 70);
+
+                    // Handle multi-line class lists
+                    $lines = explode("\n", $classLine);
+                    foreach ($lines as $line) {
+                        $output .= "  {$indent}{$line}\n";
+                    }
+                }
             }
         }
 
         return $output;
     }
 
-    /**
-     * Get filtered directory items.
-     */
-    protected function getFilteredItems(string $dir, string $repoRoot, GitignoreParser $gitignoreParser): array
+    private function generateOtherDirectories(string $repoPath): string
     {
-        $items = array_diff(scandir($dir), ['.', '..']);
+        $output = '';
 
-        $items = array_filter($items, function ($item) use ($dir, $repoRoot, $gitignoreParser) {
-            // Skip hidden files/directories
-            if (str_starts_with($item, '.')) {
-                return false;
-            }
+        $topLevelDirs = ['config', 'resources', 'tests', 'docker', 'routes'];
 
-            // Skip commonly verbose/boilerplate directories at root level
-            if ($dir === $repoRoot) {
-                $skipDirs = config('generator.tree.skip_at_root');
-                if (in_array($item, $skipDirs)) {
-                    return false;
+        foreach ($topLevelDirs as $dir) {
+            $fullPath = $repoPath.'/'.$dir;
+
+            if (File::isDirectory($fullPath)) {
+                $output .= "{$dir}/\n";
+
+                // Show subdirectories for specific cases
+                if (in_array($dir, ['resources', 'tests'])) {
+                    $subdirs = collect(File::directories($fullPath))
+                        ->map(fn ($d) => basename($d))
+                        ->sort()
+                        ->values();
+
+                    foreach ($subdirs as $index => $subdir) {
+                        $isLast = $index === $subdirs->count() - 1;
+                        $prefix = $isLast ? '└──' : '├──';
+                        $output .= "  {$prefix} {$subdir}/\n";
+                    }
                 }
             }
+        }
 
-            // Calculate relative path from repo root
-            $itemPath = $dir.'/'.$item;
-            $relativePath = str_replace(rtrim($repoRoot, '/').'/', '', $itemPath);
+        return $output;
+    }
 
-            // Handle case where itemPath equals repoRoot exactly
-            if ($relativePath === $itemPath) {
-                $relativePath = $item;
+    private function shouldExpand(string $dirName): bool
+    {
+        return in_array($dirName, $this->expandDirectories);
+    }
+
+    private function getClassNames(string $directory): array
+    {
+        if (! File::isDirectory($directory)) {
+            return [];
+        }
+
+        // Get only files directly in this directory (not recursive)
+        $files = File::files($directory);
+        $classNames = [];
+
+        foreach ($files as $file) {
+            if ($file->getExtension() === 'php') {
+                $classNames[] = $file->getFilenameWithoutExtension();
             }
+        }
 
-            // Check gitignore patterns
-            return ! $gitignoreParser->matches($relativePath);
-        });
+        sort($classNames);
 
-        return array_values($items);
+        return $classNames;
+    }
+
+    private function formatClassList(array $classes, int $maxWidth = 70): string
+    {
+        if (empty($classes)) {
+            return '';
+        }
+
+        $lines = [];
+        $currentLine = '';
+
+        foreach ($classes as $class) {
+            if ($currentLine === '') {
+                $currentLine = $class;
+            } elseif (strlen($currentLine.', '.$class) <= $maxWidth) {
+                $currentLine .= ', '.$class;
+            } else {
+                $lines[] = $currentLine.',';
+                $currentLine = $class;
+            }
+        }
+
+        if ($currentLine !== '') {
+            $lines[] = $currentLine;
+        }
+
+        return implode("\n", $lines);
     }
 }
